@@ -1,6 +1,6 @@
 # Heartbeat Monitor — Implementation Plan
 
-Status: Draft. Sequential, mechanical decomposition of the work described in `docs/REQUIREMENTS.md` and `docs/DESIGN.md`. Each phase ends at a demonstrable state and is small enough to review on its own. Tests are added alongside features within their phase, not deferred.
+Status: In progress. Sequential, mechanical decomposition of the work described in `docs/REQUIREMENTS.md` and `docs/DESIGN.md`. Each phase ends at a demonstrable state and is small enough to review on its own. Tests are added alongside features within their phase, not deferred.
 
 ## Conventions
 
@@ -12,30 +12,31 @@ Status: Draft. Sequential, mechanical decomposition of the work described in `do
 
 ---
 
-## Phase 1 — Repo bootstrap
+## Phase 1 — Repo bootstrap ✓ DONE
 
 **Goal:** A clone of the repo can be brought up with `scripts/start.sh` (or `.ps1`) and exposes an empty health endpoint, with lint and tests wired.
 
 **Tasks**
 
 1. Initialize `.gitignore` with the entries listed in DESIGN.md §2.
-2. Backend package: `cd backend && uv init --package heartbeat`. Add deps: `fastapi`, `uvicorn[standard]`, `sqlalchemy[asyncio]`, `asyncpg`, `alembic`, `pydantic`, `pydantic-settings`, `httpx`, `aiosmtplib`, `openai`. Dev deps: `pytest`, `pytest-asyncio`, `ruff`. Configure `ruff` in `pyproject.toml` (line length 100, target py312).
-3. Backend skeleton: `src/heartbeat/main.py` exposes `FastAPI()` with a single `GET /api/v1/system/status` returning `{check_source, email_sink, smtp_from, n, m}` from a placeholder config.
-4. Frontend package: `cd frontend && npx create-next-app@latest .` with TypeScript, Tailwind, app router, no `src/` choice = use `src/`. Configure `next.config.mjs` with `output: 'export'`. Initialize shadcn/ui (`npx shadcn@latest init`). Add deps: `@tanstack/react-query`, `react-hook-form`, `zod`, `recharts`.
-5. `Dockerfile.backend`: multi-stage build. Stage 1: `node:lts` builds the frontend (`npm ci && npm run build`) producing `out/`. Stage 2: `python:3.12-slim` with `uv` installed, copies the backend source and `out/` into `/app/static`. CMD: `uv run alembic upgrade head && uv run uvicorn heartbeat.main:app --host 0.0.0.0 --port 8000`.
-6. `docker-compose.yml`: `db` service (postgres:16, named volume, healthcheck), `backend` service (built from Dockerfile.backend, depends on db healthy, env vars passed through).
-7. `docker-compose.demo.yml`: override that sets `CHECK_SOURCE=simulated` and `EMAIL_SINK=log` on `backend`.
+2. Backend package: wrote `pyproject.toml` directly (skipped `uv init` to avoid name ambiguity) with all runtime deps and `[dependency-groups] dev` for pytest/ruff (note: `[tool.uv] dev-dependencies` was tried first but is deprecated in favour of the PEP 735 `[dependency-groups]` key). Configured `ruff` (line length 100, target py312) and `pytest` in the same file. Run `uv sync` to generate `uv.lock`.
+3. Backend skeleton: `src/heartbeat/main.py` with `GET /api/v1/system/status` reading `CHECK_SOURCE`, `EMAIL_SINK`, and `SMTP_FROM` from `os.environ` (with sensible defaults) so the demo compose override is reflected immediately. `N=3` and `M=2` remain hardcoded constants. (The full pydantic-settings wiring is Phase 2 task 6.)
+4. Frontend package: `npx create-next-app@latest frontend` with `--typescript --tailwind --app --src-dir --eslint --import-alias "@/*" --no-git`. Config file is `next.config.ts` (TypeScript variant, not `.mjs`). Set `output: "export"`. Initialized shadcn/ui with `npx shadcn@latest init -d`. Added `@tanstack/react-query`, `react-hook-form`, `zod`, `recharts` via `npm install`.
+5. `Dockerfile.backend`: two-stage build. Stage 1: `node:lts` — `npm ci && npm run build` → `out/`. Stage 2: `python:3.12-slim` with uv from `ghcr.io/astral-sh/uv:latest`; copies `backend/` and runs `uv sync --no-dev --frozen`; copies `out/` to `./static`. CMD is plain `uvicorn` for Phase 1; the `alembic upgrade head` prefix is added in Phase 2 once alembic is configured.
+6. `docker-compose.yml`: `db` (postgres:16, named volume, healthcheck `pg_isready`), `backend` (built from Dockerfile.backend, depends on db healthy, `OPENROUTER_API_KEY` forwarded from host env via `${OPENROUTER_API_KEY:-}`).
+7. `docker-compose.demo.yml`: override sets `CHECK_SOURCE=simulated` and `EMAIL_SINK=log` on `backend`.
 8. `scripts/start.{ps1,sh}` and `scripts/stop.{ps1,sh}` per DESIGN.md §14.
-9. Stub `README.md` with one-line summary and "see docs/" pointer; full content lands in phase 13.
+9. Stub `README.md` with one-paragraph summary, quick-start commands, and "see docs/" pointer.
 
 **Tests**
 
-- One trivial unit test (`tests/unit/test_smoke.py` — `assert 1 + 1 == 2`) to prove pytest is wired.
-- `uv run pytest` runs cleanly; `uv run ruff check` and `uv run ruff format --check` pass.
+- `backend/tests/unit/test_smoke.py` — `assert 1 + 1 == 2`.
+- `uv run pytest` (1 passed), `uv run ruff check` (clean), `uv run ruff format --check` (clean), `npm run lint` (clean).
 
 **Done when**
 
-- `scripts/start.sh` (or `.ps1`) succeeds; `curl http://localhost:8000/api/v1/system/status` returns 200 with placeholder fields.
+- `scripts/start.sh` (or `.ps1`) succeeds; `curl http://localhost:8000/api/v1/system/status` returns 200.
+- Demo mode: `-Demo` / `--demo` flag causes status to reflect `check_source=simulated, email_sink=log`.
 - `scripts/stop.sh` succeeds.
 - `uv run pytest`, `uv run ruff check`, `npm run lint` (frontend) all pass.
 

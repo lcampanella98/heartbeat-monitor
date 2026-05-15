@@ -1,0 +1,5 @@
+services:
+  backend:
+    environment:
+      CHECK_SOURCE: simulated
+      EMAIL_SINK: log
