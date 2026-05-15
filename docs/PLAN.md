@@ -42,7 +42,7 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 2 — Config, DB, Alembic, Clock, real system status
+## Phase 2 — Config, DB, Alembic, Clock, real system status ✓ DONE
 
 **Goal:** Backend has a typed config, a working async DB session, the first migration creates `users` with the seeded `id=1` row, and the Clock abstraction is in place.
 

@@ -5,6 +5,8 @@ services:
       POSTGRES_USER: heartbeat
       POSTGRES_PASSWORD: heartbeat
       POSTGRES_DB: heartbeat
+    ports:
+      - "5432:5432"  # exposes DB to host for local dev/tests; conflicts if host Postgres is already on 5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
