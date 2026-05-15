@@ -68,23 +68,24 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 3 — Endpoint CRUD
+## Phase 3 — Endpoint CRUD ✓ DONE
 
 **Goal:** Endpoints can be created, read, updated, deleted, enabled, and disabled via the API. The model carries every column DESIGN.md §4.2 specs, including streak state and simulator config (still unused).
 
 **Tasks**
 
 1. Model `models/endpoint.py` per DESIGN.md §4.2 (all columns).
-2. Alembic migration.
-3. Pydantic schemas: `EndpointCreate`, `EndpointUpdate`, `EndpointRead`. Validate `url` (must be http/https), `check_interval_seconds` ∈ {30, 60, 300, 900}, `timeout_seconds` ∈ [1, 60].
-4. `services/endpoint_service.py`: CRUD + enable/disable. `next_due_at` set to `clock.now()` on create (so a fresh endpoint is immediately due).
+2. Alembic migration (`197ec6c37b39_create_endpoints.py`). Downgrade drops the `streak_outcome` enum type via `DROP TYPE IF EXISTS`.
+3. Pydantic schemas: `EndpointCreate`, `EndpointUpdate`, `EndpointRead`. Validate `url` (must be http/https), `check_interval_seconds` ∈ {30, 60, 300, 900}, `timeout_seconds` ∈ [1, 60], `sim_failure_rate` ∈ [0, 1], `sim_latency_min_ms ≤ sim_latency_max_ms` (cross-field), `name` non-empty. `EndpointRead.current_streak_outcome` typed as `StreakOutcome | None` so the OpenAPI schema emits the enum constraint.
+4. `services/endpoint_service.py`: CRUD + enable/disable. `next_due_at` set to `clock.now()` on create (so a fresh endpoint is immediately due). `enable_endpoint` preserves `next_due_at` intentionally — if it is in the past the scheduler picks the endpoint up immediately; if in the future, the schedule is preserved. Sending `"sim_outage_windows": null` on update is treated as `[]` (clears all windows).
 5. Router `api/endpoints.py`: routes per DESIGN.md §8 for endpoints. Mount under `/api/v1`.
-6. Deleting an endpoint is hard delete; cascading FK behavior on related tables is deferred to phases that create those tables (set up `ondelete='CASCADE'` on FKs as they appear).
+6. `heartbeat/dependencies.py`: shared `get_clock()` FastAPI dependency returning `RealClock`. Integration tests override both `get_clock` and `get_session` (via `app.dependency_overrides`) to inject `FakeClock` and the NullPool test engine respectively. Overriding `get_session` is required on Windows to prevent asyncpg connections from being reused across test event loops.
+7. Deleting an endpoint is hard delete; cascading FK behavior on related tables is deferred to phases that create those tables (set up `ondelete='CASCADE'` on FKs as they appear).
 
 **Tests**
 
-- Integration: full CRUD round-trip. Validation 422s for bad URL, bad interval, bad timeout. Enable/disable flips the flag.
-- Unit: validator-level tests for the pydantic schemas.
+- Integration: full CRUD round-trip. Validation 422s for bad URL, bad interval, bad timeout, empty name, inverted latency range. Enable/disable flips the flag. Null outage windows on PUT clears to `[]`. `next_due_at` set to `clock.now()` on create verified via `FakeClock`.
+- Unit: validator-level tests for all schema constraints including cross-field latency range and partial-update edge cases.
 
 **Done when**
 

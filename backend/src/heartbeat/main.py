@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from heartbeat.api.endpoints import router as endpoints_router
 from heartbeat.config import settings
 from heartbeat.db import check_db_connection, engine
 
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Heartbeat Monitor", lifespan=lifespan)
+app.include_router(endpoints_router)
 
 
 class SystemStatus(BaseModel):
