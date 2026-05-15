@@ -1,19 +1,44 @@
+import logging
+import random
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Literal
 
+import httpx
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 from heartbeat.api.endpoints import router as endpoints_router
+from heartbeat.checker.real import RealChecker
+from heartbeat.checker.simulated import SimulatedChecker
+from heartbeat.clock import RealClock
 from heartbeat.config import settings
 from heartbeat.db import check_db_connection, engine
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await check_db_connection()
+
+    http_client: httpx.AsyncClient | None = None
+
+    if settings.check_source == "real":
+        http_client = httpx.AsyncClient(
+            follow_redirects=True,
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+        )
+        app.state.checker = RealChecker(http_client=http_client)
+        logger.info("Checker: real (live HTTP requests)")
+    else:
+        app.state.checker = SimulatedChecker(clock=RealClock(), rng=random.Random())
+        logger.info("Checker: simulated (no outbound HTTP)")
+
     yield
+
+    if http_client is not None:
+        await http_client.aclose()
     await engine.dispose()
 
 

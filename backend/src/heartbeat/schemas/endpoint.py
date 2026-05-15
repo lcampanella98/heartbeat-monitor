@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import time as dt_time
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -9,6 +10,20 @@ from heartbeat.models.endpoint import StreakOutcome
 class SimOutageWindow(BaseModel):
     start: str  # "HH:MM" UTC
     end: str  # "HH:MM" UTC
+
+    @model_validator(mode="after")
+    def start_must_be_before_end(self) -> "SimOutageWindow":
+        try:
+            start_t = dt_time.fromisoformat(self.start)
+            end_t = dt_time.fromisoformat(self.end)
+        except ValueError as exc:
+            raise ValueError("outage window start/end must be in HH:MM format") from exc
+        if start_t >= end_t:
+            raise ValueError(
+                "outage window start must be before end"
+                " (midnight-spanning windows are not supported)"
+            )
+        return self
 
 
 class EndpointCreate(BaseModel):

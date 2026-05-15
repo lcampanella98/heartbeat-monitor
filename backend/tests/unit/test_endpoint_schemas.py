@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from heartbeat.schemas.endpoint import EndpointCreate, EndpointUpdate
+from heartbeat.schemas.endpoint import EndpointCreate, EndpointUpdate, SimOutageWindow
 
 
 def test_valid_http_url() -> None:
@@ -153,3 +153,44 @@ def test_update_partial_latency_range_not_validated() -> None:
     # Sending only one side of the range in a partial update should not raise.
     up = EndpointUpdate(sim_latency_min_ms=9999)
     assert up.sim_latency_min_ms == 9999
+
+
+def test_outage_window_valid() -> None:
+    w = SimOutageWindow(start="14:00", end="14:30")
+    assert w.start == "14:00"
+    assert w.end == "14:30"
+
+
+def test_outage_window_midnight_spanning_rejected() -> None:
+    with pytest.raises(ValidationError, match="start must be before end"):
+        SimOutageWindow(start="23:00", end="01:00")
+
+
+def test_outage_window_equal_start_end_rejected() -> None:
+    with pytest.raises(ValidationError, match="start must be before end"):
+        SimOutageWindow(start="10:00", end="10:00")
+
+
+def test_outage_window_invalid_format_rejected() -> None:
+    with pytest.raises(ValidationError, match="HH:MM format"):
+        SimOutageWindow(start="25:00", end="26:00")
+
+
+def test_outage_window_in_endpoint_create() -> None:
+    ep = EndpointCreate(
+        name="x",
+        url="https://ok.com",
+        check_interval_seconds=60,
+        sim_outage_windows=[{"start": "02:00", "end": "03:00"}],
+    )
+    assert ep.sim_outage_windows[0].start == "02:00"
+
+
+def test_midnight_spanning_window_rejected_in_endpoint_create() -> None:
+    with pytest.raises(ValidationError, match="start must be before end"):
+        EndpointCreate(
+            name="x",
+            url="https://ok.com",
+            check_interval_seconds=60,
+            sim_outage_windows=[{"start": "23:00", "end": "01:00"}],
+        )

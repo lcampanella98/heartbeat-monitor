@@ -93,26 +93,27 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 4 — Checker interface and implementations
+## Phase 4 — Checker interface and implementations ✓ DONE
 
 **Goal:** `RealChecker` and `SimulatedChecker` both implement `Checker`, are wired into DI based on `CHECK_SOURCE`, and produce equivalent `CheckOutcome` shapes.
 
 **Tasks**
 
 1. `checker/__init__.py`: `Checker` Protocol, `CheckOutcome` dataclass, `ErrorCategory` enum.
-2. `checker/real.py`: `RealChecker(http_client, clock)` performing `await http_client.get(url, timeout=timeout)`. Map exceptions: `httpx.TimeoutException` → `timeout`; `httpx.ConnectError` → `connection_refused`; DNS-style errors → `dns`; TLS errors → `tls`; non-2xx response → `non_2xx`; everything else → `other`.
-3. `checker/simulated.py`: `SimulatedChecker(clock, rng)`. Logic per DESIGN.md §5.2: outage window check first, then failure-rate roll, then latency draw. Outage windows interpreted as repeating-daily UTC time-of-day intervals.
-4. DI: `main.py` constructs the right checker at startup based on `settings.check_source` and binds it as a FastAPI dependency.
-5. The `httpx.AsyncClient` used by `RealChecker` is a module-level singleton with a sensible connection pool, created in lifespan startup and closed on shutdown.
+2. `checker/real.py`: `RealChecker(http_client)` performing `await http_client.get(url, timeout=timeout)`. Latency measured with `time.monotonic()`. Exception mapping: `httpx.TimeoutException` → `timeout`; `httpx.ConnectError` categorised by `__cause__` type and message keywords (ssl/tls/certificate → `tls`; getaddrinfo/nodename → `dns`; else → `connection_refused`); all other `httpx.HTTPError` → `other`; non-2xx response → `non_2xx`.
+3. `checker/simulated.py`: `SimulatedChecker(clock, rng)`. Logic per DESIGN.md §5.2: outage window check first, then failure-rate roll, then latency draw. Outage windows are repeating-daily UTC time-of-day intervals `{"start":"HH:MM","end":"HH:MM"}`. Midnight-spanning windows are not supported; enforced by a `SimOutageWindow` schema validator (see note below).
+4. DI: `main.py` stores the checker on `app.state.checker` during lifespan; `get_checker(request)` in `dependencies.py` retrieves it. `httpx.AsyncClient` constructed only when `check_source == "real"`, closed on shutdown. Startup log line names the active checker.
+5. `SimOutageWindow` schema validator added: rejects windows where `start >= end` (catches midnight-spanning and equal start/end) and validates `HH:MM` parse.
 
 **Tests**
 
-- Unit, `RealChecker`: stub `httpx.AsyncClient` to return synthetic responses / raise exceptions; assert each maps to the right `CheckOutcome`.
-- Unit, `SimulatedChecker`: seeded `random.Random` + `FakeClock`; deterministic outcomes for known inputs. Cover: outage window hit, failure-rate hit, success, latency bounds.
+- Unit, `RealChecker`: stub `httpx.AsyncClient`; assert each response / exception maps to the correct `CheckOutcome`. Covers both message-based and `__cause__`-based TLS/DNS detection paths.
+- Unit, `SimulatedChecker`: seeded `random.Random` + `FakeClock`; deterministic outcomes. Covers outage window hit/miss, inclusive start / exclusive end boundaries, failure-rate roll, success, latency bounds.
+- Unit, `SimOutageWindow`: valid window, midnight-spanning rejected, equal start/end rejected, bad format rejected.
 
 **Done when**
 
-- Both checkers callable in isolation with deterministic tests. `CHECK_SOURCE` toggle changes which one is bound; verify via a thin debug endpoint or just a startup log line.
+- Both checkers callable in isolation with deterministic tests. `CHECK_SOURCE` toggle changes which one is bound; verified via startup log line.
 
 ---
 
