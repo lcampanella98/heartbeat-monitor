@@ -10,6 +10,7 @@ from heartbeat.checker import Checker
 from heartbeat.clock import Clock
 from heartbeat.models.check_result import CheckResult
 from heartbeat.models.endpoint import Endpoint, StreakOutcome
+from heartbeat.services import incident_service
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,8 @@ class Scheduler:
                     error_message=outcome.error_message,
                 )
                 session.add(check_result)
+
+                await incident_service.apply_check_result(session, endpoint, check_result)
 
                 interval = timedelta(seconds=endpoint.check_interval_seconds)
                 prev_due = endpoint.next_due_at

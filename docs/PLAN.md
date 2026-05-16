@@ -152,7 +152,7 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 6 — Streaks, incidents, postmortems
+## Phase 6 — Streaks, incidents, postmortems ✓ DONE
 
 **Goal:** Failure / success streaks open and close incidents at thresholds N=3 / M=2. Closed incidents have their `frozen_timeline` populated. The `postmortems` table exists.
 
@@ -174,6 +174,13 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 **Done when**
 
 - A run of three consecutive failures opens an incident; two consecutive successes close it and populate the frozen timeline including bracketing successes.
+
+**Implementation notes**
+
+- Task 1 was a no-op: streak columns were already added in the Phase 3 migration.
+- Integration tests use a `SequenceChecker` stub (deterministic predetermined outcomes) rather than `SimulatedChecker`, for reliable sequence control.
+- `N` and `M` imported from `incident_service` in `main.py` rather than restated as literals.
+- Post-review fixes documented in `docs/code_review/CR_6.md`.
 
 ---
 

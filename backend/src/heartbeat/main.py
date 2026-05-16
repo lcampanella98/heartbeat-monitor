@@ -9,12 +9,14 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from heartbeat.api.endpoints import router as endpoints_router
+from heartbeat.api.incidents import router as incidents_router
 from heartbeat.checker.real import RealChecker
 from heartbeat.checker.simulated import SimulatedChecker
 from heartbeat.clock import RealClock
 from heartbeat.config import settings
 from heartbeat.db import async_session_factory, check_db_connection, engine
 from heartbeat.scheduler import Scheduler
+from heartbeat.services.incident_service import M, N
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Heartbeat Monitor", lifespan=lifespan)
 app.include_router(endpoints_router)
+app.include_router(incidents_router)
 
 
 class SystemStatus(BaseModel):
@@ -74,6 +77,6 @@ async def system_status() -> SystemStatus:
         check_source=settings.check_source,
         email_sink=settings.email_sink,
         smtp_from=settings.smtp_from or None,
-        n=3,
-        m=2,
+        n=N,
+        m=M,
     )
