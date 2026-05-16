@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from heartbeat.models.base import Base
+
+if TYPE_CHECKING:
+    pass
 
 
 class Incident(Base):
@@ -35,6 +41,12 @@ class Incident(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )
+    postmortem: Mapped[Postmortem | None] = relationship(
+        "Postmortem",
+        uselist=False,
+        back_populates="incident",
+        lazy="raise",
+    )
 
 
 class Postmortem(Base):
@@ -50,3 +62,4 @@ class Postmortem(Base):
     content: Mapped[str | None] = mapped_column(String, nullable=True)
     generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    incident: Mapped[Incident] = relationship("Incident", back_populates="postmortem")

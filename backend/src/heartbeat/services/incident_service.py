@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from heartbeat.models.check_result import CheckResult
 from heartbeat.models.endpoint import Endpoint, StreakOutcome
@@ -143,7 +144,11 @@ async def list_incidents(
     state: str = "all",
     endpoint_id: int | None = None,
 ) -> list[Incident]:
-    stmt = select(Incident).order_by(desc(Incident.started_at))
+    stmt = (
+        select(Incident)
+        .options(selectinload(Incident.postmortem))
+        .order_by(desc(Incident.started_at))
+    )
     if state == "active":
         stmt = stmt.where(Incident.ended_at.is_(None))
     elif state == "closed":
@@ -154,4 +159,8 @@ async def list_incidents(
 
 
 async def get_incident(session: AsyncSession, incident_id: int) -> Incident | None:
-    return await session.get(Incident, incident_id)
+    return await session.scalar(
+        select(Incident)
+        .options(selectinload(Incident.postmortem))
+        .where(Incident.id == incident_id)
+    )

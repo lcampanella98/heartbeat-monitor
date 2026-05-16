@@ -46,9 +46,7 @@ def upgrade() -> None:
         sa.Column("uptime_pct", sa.Numeric(5, 2), nullable=False),
         sa.ForeignKeyConstraint(["endpoint_id"], ["endpoints.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "endpoint_id", "bucket_date", name="uq_daily_rollups_endpoint_date"
-        ),
+        sa.UniqueConstraint("endpoint_id", "bucket_date", name="uq_daily_rollups_endpoint_date"),
     )
 
 

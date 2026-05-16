@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "Bash(git -C C:\\\\Users\\\\enzoc\\\\repos\\\\heartbeat-monitor status)",
+      "Bash(git -C C:\\\\Users\\\\enzoc\\\\repos\\\\heartbeat-monitor diff)",
+      "Bash(git -C C:\\\\Users\\\\enzoc\\\\repos\\\\heartbeat-monitor log --oneline -5)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
