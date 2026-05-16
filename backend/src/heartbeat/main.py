@@ -2,10 +2,13 @@ import logging
 import random
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Literal
 
 import httpx
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from heartbeat.alerts.log_sink import LogSink
@@ -84,6 +87,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Heartbeat Monitor", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(endpoints_router)
 app.include_router(incidents_router)
 app.include_router(recipients_router)
@@ -108,3 +119,8 @@ async def system_status() -> SystemStatus:
         n=N,
         m=M,
     )
+
+
+_static_dir = Path("static")
+if _static_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="static")

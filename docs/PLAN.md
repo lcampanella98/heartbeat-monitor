@@ -307,7 +307,7 @@ Implementation follows DESIGN.md §13 (in-memory simulation, bulk persistence, o
 
 ---
 
-## Phase 11 — Frontend foundation
+## Phase 11 — Frontend foundation ✓ DONE
 
 **Goal:** Frontend is structured for feature work: app router shell with nav, TanStack Query provider, typed API client, demo-mode banner, shadcn primitives in place.
 
@@ -335,7 +335,7 @@ Implementation follows DESIGN.md §13 (in-memory simulation, bulk persistence, o
 
 ## Phase 12 — Frontend feature pages
 
-**Goal:** Every page described in DESIGN.md §9 is implemented and works against the live backend.
+**Goal:** Every page described in DESIGN.md §9 is implemented and works against the live backend. Frontend is distinctive, production-grade with high design quality
 
 **Tasks** (each is a sub-deliverable, in this order)
 
