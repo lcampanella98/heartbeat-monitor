@@ -211,7 +211,7 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 8 — Rollups, retention, storage panel API
+## Phase 8 — Rollups, retention, storage panel API ✓ DONE
 
 **Goal:** Hourly and daily rollups exist, retention deletions happen on schedule, history reads route to the right tier, and the storage panel API surfaces it.
 

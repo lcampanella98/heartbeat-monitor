@@ -14,11 +14,13 @@ from heartbeat.api.endpoints import router as endpoints_router
 from heartbeat.api.incidents import router as incidents_router
 from heartbeat.api.notifications import router as notifications_router
 from heartbeat.api.recipients import router as recipients_router
+from heartbeat.api.storage import router as storage_router
 from heartbeat.checker.real import RealChecker
 from heartbeat.checker.simulated import SimulatedChecker
 from heartbeat.clock import RealClock
 from heartbeat.config import settings
 from heartbeat.db import async_session_factory, check_db_connection, engine
+from heartbeat.rollup import RollupJob
 from heartbeat.scheduler import Scheduler
 from heartbeat.services.alert_dispatcher import AlertDispatcher
 from heartbeat.services.incident_service import M, N
@@ -65,8 +67,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.scheduler = scheduler
     await scheduler.start()
 
+    rollup_job = RollupJob(session_factory=async_session_factory, clock=clock)
+    app.state.rollup_job = rollup_job
+    await rollup_job.start()
+
     yield
 
+    await rollup_job.stop()
     await scheduler.stop()
     if http_client is not None:
         await http_client.aclose()
@@ -78,6 +85,7 @@ app.include_router(endpoints_router)
 app.include_router(incidents_router)
 app.include_router(recipients_router)
 app.include_router(notifications_router)
+app.include_router(storage_router)
 
 
 class SystemStatus(BaseModel):
