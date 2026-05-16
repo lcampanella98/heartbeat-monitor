@@ -6,7 +6,11 @@
       "Bash(git -C C:\\\\Users\\\\enzoc\\\\repos\\\\heartbeat-monitor diff)",
       "Bash(git -C C:\\\\Users\\\\enzoc\\\\repos\\\\heartbeat-monitor log --oneline -5)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(npx shadcn@latest *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Skill(frontend-design:frontend-design)"
     ]
   }
 }

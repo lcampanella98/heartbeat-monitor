@@ -18,6 +18,8 @@ import type {
 const STALE_30S = 30_000
 const STALE_60S = 60_000
 
+type PollOpts = { refetchInterval?: number | false }
+
 // ---- System ----
 
 export function useSystemStatus() {
@@ -30,19 +32,21 @@ export function useSystemStatus() {
 
 // ---- Endpoints ----
 
-export function useEndpoints() {
+export function useEndpoints(opts?: PollOpts) {
   return useQuery({
     queryKey: ['endpoints'],
     queryFn: () => api.get<Endpoint[]>('/endpoints'),
     staleTime: STALE_30S,
+    ...opts,
   })
 }
 
-export function useEndpoint(id: number) {
+export function useEndpoint(id: number, opts?: PollOpts) {
   return useQuery({
     queryKey: ['endpoints', id],
     queryFn: () => api.get<Endpoint>(`/endpoints/${id}`),
     staleTime: STALE_30S,
+    ...opts,
   })
 }
 
@@ -89,12 +93,13 @@ export function useDisableEndpoint() {
   })
 }
 
-export function useRecentChecks(endpointId: number, limit = 60) {
+export function useRecentChecks(endpointId: number, limit = 60, opts?: PollOpts) {
   return useQuery({
     queryKey: ['recent-checks', endpointId, limit],
     queryFn: () =>
       api.get<CheckResult[]>(`/endpoints/${endpointId}/recent-checks?limit=${limit}`),
     staleTime: STALE_30S,
+    ...opts,
   })
 }
 
@@ -110,20 +115,21 @@ export function useEndpointHistory(
   })
 }
 
-export function useEndpointUptime(endpointId: number) {
+export function useEndpointUptime(endpointId: number, opts?: PollOpts) {
   return useQuery({
     queryKey: ['uptime', endpointId],
     queryFn: () => api.get<UptimePercentages>(`/endpoints/${endpointId}/uptime`),
     staleTime: STALE_60S,
+    ...opts,
   })
 }
 
 // ---- Incidents ----
 
-export function useIncidents(params?: {
-  state?: 'active' | 'closed' | 'all'
-  endpoint_id?: number
-}) {
+export function useIncidents(
+  params?: { state?: 'active' | 'closed' | 'all'; endpoint_id?: number },
+  opts?: PollOpts,
+) {
   const qs = new URLSearchParams()
   if (params?.state) qs.set('state', params.state)
   if (params?.endpoint_id != null) qs.set('endpoint_id', String(params.endpoint_id))
@@ -133,14 +139,16 @@ export function useIncidents(params?: {
     queryKey: ['incidents', params],
     queryFn: () => api.get<Incident[]>(`/incidents${queryString ? `?${queryString}` : ''}`),
     staleTime: STALE_30S,
+    ...opts,
   })
 }
 
-export function useIncident(id: number) {
+export function useIncident(id: number, opts?: PollOpts) {
   return useQuery({
     queryKey: ['incidents', id],
     queryFn: () => api.get<Incident>(`/incidents/${id}`),
     staleTime: STALE_30S,
+    ...opts,
   })
 }
 

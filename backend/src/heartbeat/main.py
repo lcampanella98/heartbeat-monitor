@@ -8,6 +8,7 @@ from typing import Literal
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -123,4 +124,19 @@ async def system_status() -> SystemStatus:
 
 _static_dir = Path("static")
 if _static_dir.is_dir():
-    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="static")
+    _next_dir = _static_dir / "_next"
+    if _next_dir.is_dir():
+        app.mount("/_next", StaticFiles(directory=str(_next_dir)), name="next-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str) -> FileResponse:
+        candidate = _static_dir / full_path
+        if candidate.is_file():
+            return FileResponse(str(candidate))
+        index = _static_dir / full_path / "index.html"
+        if index.is_file():
+            return FileResponse(str(index))
+        html = _static_dir / f"{full_path}.html"
+        if html.is_file():
+            return FileResponse(str(html))
+        return FileResponse(str(_static_dir / "index.html"))

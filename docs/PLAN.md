@@ -333,9 +333,9 @@ Implementation follows DESIGN.md §13 (in-memory simulation, bulk persistence, o
 
 ---
 
-## Phase 12 — Frontend feature pages
+## Phase 12 — Frontend feature pages ✓ DONE
 
-**Goal:** Every page described in DESIGN.md §9 is implemented and works against the live backend. Frontend is distinctive, production-grade with high design quality
+**Goal:** Every page described in DESIGN.md §9 is implemented and works against the live backend. Frontend is distinctive, beautiful, production-grade with high design quality
 
 **Tasks** (each is a sub-deliverable, in this order)
 
