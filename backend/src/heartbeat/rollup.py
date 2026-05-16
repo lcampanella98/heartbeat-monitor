@@ -1,7 +1,7 @@
 import asyncio
 import contextlib
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -13,6 +13,17 @@ logger = logging.getLogger(__name__)
 RAW_RETENTION_DAYS = 30
 HOURLY_RETENTION_DAYS = 180
 ROLLUP_INTERVAL_SECONDS = 300  # 5 minutes
+
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+def _hourly_lookback(now: datetime, full: bool) -> datetime:
+    return _EPOCH if full else now - timedelta(days=RAW_RETENTION_DAYS)
+
+
+def _daily_lookback(now: datetime, full: bool) -> datetime:
+    return _EPOCH if full else now - timedelta(days=HOURLY_RETENTION_DAYS)
+
 
 _HOURLY_UPSERT = text(
     """
@@ -96,17 +107,21 @@ class RollupJob:
             await self.run_once()
             await asyncio.sleep(self.interval_seconds)
 
-    async def run_once(self) -> None:
-        """Run all rollup and retention steps."""
+    async def run_once(self, full: bool = False) -> None:
+        """Run all rollup and retention steps.
+
+        When full=True, widens the UPSERT lookback to cover all available data
+        (used after bulk seeding to backfill rollups across the full history).
+        """
         now = self._clock.now()
         async with self._session_factory() as session:
             await session.execute(
                 _HOURLY_UPSERT,
-                {"lookback": now - timedelta(days=RAW_RETENTION_DAYS)},
+                {"lookback": _hourly_lookback(now, full)},
             )
             await session.execute(
                 _DAILY_UPSERT,
-                {"lookback": now - timedelta(days=HOURLY_RETENTION_DAYS)},
+                {"lookback": _daily_lookback(now, full)},
             )
             await session.execute(
                 text("DELETE FROM check_results WHERE checked_at < :cutoff"),
@@ -118,4 +133,4 @@ class RollupJob:
             )
             await session.commit()
         self.last_run_at = now
-        logger.info("Rollup complete at %s", now)
+        logger.info("Rollup complete at %s (full=%s)", now, full)

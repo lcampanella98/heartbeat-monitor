@@ -1,9 +1,10 @@
 """Unit tests for rollup math and history routing."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from heartbeat.rollup import _hourly_lookback, _daily_lookback, RAW_RETENTION_DAYS, HOURLY_RETENTION_DAYS
 from heartbeat.services.history_service import resolve_range
 
 
@@ -32,3 +33,15 @@ def test_resolve_range_daily():
 def test_resolve_range_unknown():
     with pytest.raises(ValueError, match="Unknown range key"):
         resolve_range("bad")
+
+
+def test_rollup_full_lookback_wider_than_default() -> None:
+    now = datetime(2025, 6, 1, tzinfo=UTC)
+    assert _hourly_lookback(now, full=True) < _hourly_lookback(now, full=False)
+    assert _daily_lookback(now, full=True) < _daily_lookback(now, full=False)
+
+
+def test_rollup_default_lookback_matches_retention() -> None:
+    now = datetime(2025, 6, 1, tzinfo=UTC)
+    assert _hourly_lookback(now, full=False) == now - timedelta(days=RAW_RETENTION_DAYS)
+    assert _daily_lookback(now, full=False) == now - timedelta(days=HOURLY_RETENTION_DAYS)

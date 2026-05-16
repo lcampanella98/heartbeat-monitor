@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import desc, select
@@ -16,6 +17,44 @@ N = 3  # consecutive failures to open an incident
 M = 2  # consecutive successes to close an incident
 
 
+@dataclass(frozen=True)
+class StreakState:
+    outcome: StreakOutcome | None
+    count: int
+    started_at: datetime | None
+
+
+@dataclass(frozen=True)
+class StreakDecision:
+    next_state: StreakState
+    open_at: datetime | None  # set when N consecutive failures just reached
+    close_at: datetime | None  # set when M consecutive successes just reached
+
+
+def streak_step(
+    state: StreakState,
+    outcome: StreakOutcome,
+    checked_at: datetime,
+) -> StreakDecision:
+    if outcome == state.outcome:
+        new_count = state.count + 1
+        new_started_at = state.started_at
+    else:
+        new_count = 1
+        new_started_at = checked_at
+
+    next_state = StreakState(outcome=outcome, count=new_count, started_at=new_started_at)
+
+    open_at = (
+        next_state.started_at if (outcome == StreakOutcome.failure and new_count == N) else None
+    )
+    close_at = (
+        next_state.started_at if (outcome == StreakOutcome.success and new_count == M) else None
+    )
+
+    return StreakDecision(next_state=next_state, open_at=open_at, close_at=close_at)
+
+
 async def apply_check_result(
     session: AsyncSession,
     endpoint: Endpoint,
@@ -24,41 +63,33 @@ async def apply_check_result(
     # Returns (kind, incident) pairs to be dispatched after the caller commits;
     # dispatching post-commit ensures the dispatcher opens a fresh session to
     # a fully consistent snapshot.
-    outcome = check_result.outcome
+    state = StreakState(
+        outcome=endpoint.current_streak_outcome,
+        count=endpoint.current_streak_count,
+        started_at=endpoint.streak_started_at,
+    )
+    decision = streak_step(state, check_result.outcome, check_result.checked_at)
+
+    endpoint.current_streak_outcome = decision.next_state.outcome
+    endpoint.current_streak_count = decision.next_state.count
+    endpoint.streak_started_at = decision.next_state.started_at
+
     events: list[tuple[NotificationKind, Incident]] = []
 
-    # Update streak state in-place on the endpoint
-    if outcome == endpoint.current_streak_outcome:
-        endpoint.current_streak_count += 1
-    else:
-        endpoint.current_streak_outcome = outcome
-        endpoint.current_streak_count = 1
-        endpoint.streak_started_at = check_result.checked_at
-
-    if (
-        endpoint.current_streak_outcome == StreakOutcome.failure
-        and endpoint.current_streak_count == N
-    ):
+    if decision.open_at is not None:
         # Guard against crash-recovery re-entry: if the server restarted with
         # streak_count already at N and an open incident exists, do not open a second.
         open_incident = await _get_open_incident(session, endpoint.id)
         if open_incident is None:
-            incident = Incident(
-                endpoint_id=endpoint.id,
-                started_at=endpoint.streak_started_at,
-            )
+            incident = Incident(endpoint_id=endpoint.id, started_at=decision.open_at)
             session.add(incident)
             events.append((NotificationKind.incident_opened, incident))
             logger.info("Incident opened for endpoint %d", endpoint.id)
 
-    elif (
-        endpoint.current_streak_outcome == StreakOutcome.success
-        and endpoint.current_streak_count == M
-    ):
+    if decision.close_at is not None:
         open_incident = await _get_open_incident(session, endpoint.id)
         if open_incident is not None:
-            # ended_at is the timestamp of the first success in the closing streak
-            ended_at = endpoint.streak_started_at
+            ended_at = decision.close_at
             open_incident.ended_at = ended_at
             open_incident.duration_seconds = int(
                 (ended_at - open_incident.started_at).total_seconds()

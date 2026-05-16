@@ -269,7 +269,7 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 10 — Demo pre-seed
+## Phase 10 — Demo pre-seed ✓ DONE
 
 **Goal:** Starting the stack with `scripts/start.sh --demo` against an empty DB produces a fully-realized demo: ~75 days of history across all three storage tiers, multiple incidents, and a banner indicating demo modes.
 

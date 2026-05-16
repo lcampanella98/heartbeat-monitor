@@ -22,6 +22,7 @@ from heartbeat.config import settings
 from heartbeat.db import async_session_factory, check_db_connection, engine
 from heartbeat.rollup import RollupJob
 from heartbeat.scheduler import Scheduler
+from heartbeat.seed import maybe_seed
 from heartbeat.services.alert_dispatcher import AlertDispatcher
 from heartbeat.services.incident_service import M, N
 
@@ -34,6 +35,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     http_client: httpx.AsyncClient | None = None
     clock = RealClock()
+
+    await maybe_seed(async_session_factory, clock)
 
     if settings.check_source == "real":
         http_client = httpx.AsyncClient(
