@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from heartbeat.clock import Clock
 from heartbeat.db import get_session
 from heartbeat.dependencies import get_clock
+from heartbeat.schemas.check_result import CheckResultRead
 from heartbeat.schemas.endpoint import EndpointCreate, EndpointRead, EndpointUpdate
-from heartbeat.services import endpoint_service
+from heartbeat.services import check_result_service, endpoint_service
 
 router = APIRouter(prefix="/api/v1/endpoints", tags=["endpoints"])
 
@@ -71,3 +72,15 @@ async def disable_endpoint(
     if ep is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint not found")
     return ep  # type: ignore[return-value]
+
+
+@router.get("/{endpoint_id}/recent-checks", response_model=list[CheckResultRead])
+async def get_recent_checks(
+    endpoint_id: int,
+    limit: int = Query(default=60, ge=1, le=500),
+    session: AsyncSession = Depends(get_session),
+) -> list[CheckResultRead]:
+    ep = await endpoint_service.get_endpoint(session, endpoint_id)
+    if ep is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint not found")
+    return await check_result_service.get_recent_checks(session, endpoint_id, limit)  # type: ignore[return-value]

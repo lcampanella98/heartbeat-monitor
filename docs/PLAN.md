@@ -117,7 +117,7 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 5 — check_results + scheduler
+## Phase 5 — check_results + scheduler ✓ DONE
 
 **Goal:** The scheduler picks due endpoints, runs the configured checker, persists results, advances `next_due_at`, and never spawns duplicate concurrent checks for the same endpoint.
 
@@ -139,6 +139,16 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 **Done when**
 
 - Bringing up the stack against a created endpoint produces rows in `check_results` on the schedule.
+
+**Implementation notes**
+
+- `ErrorCategory` defined in `models/check_result.py` (canonical); `checker/__init__.py` imports it from there.
+- `CheckResult.outcome` reuses the existing `streak_outcome` PostgreSQL enum (`create_type=False`); `error_category` enum created by `op.create_table` via SQLAlchemy's `before_create` event — no explicit `CREATE TYPE` needed.
+- `tick()` returns the set of spawned tasks so tests can `await asyncio.gather(*tasks)` and assert synchronously.
+- Semaphore gates only `checker.check()`, not DB operations.
+- `notin_()` condition on `in_flight` omitted entirely when the set is empty (avoids invalid `NOT IN ()` SQL).
+- Recent-checks query lives in `services/check_result_service.py`, not inline in the router.
+- Post-review fixes (see `docs/code_review/CR_5.md`): removed redundant `ErrorCategory` value round-trip in scheduler, fixed import order in `checker/__init__.py`, added `__table_args__` index to `CheckResult` model, extracted route query to service.
 
 ---
 

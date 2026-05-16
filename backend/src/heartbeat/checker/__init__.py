@@ -1,18 +1,10 @@
-import enum
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol
 
+from heartbeat.models.check_result import ErrorCategory
+
 if TYPE_CHECKING:
     from heartbeat.models.endpoint import Endpoint
-
-
-class ErrorCategory(str, enum.Enum):
-    timeout = "timeout"
-    connection_refused = "connection_refused"
-    dns = "dns"
-    tls = "tls"
-    non_2xx = "non_2xx"
-    other = "other"
 
 
 @dataclass

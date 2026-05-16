@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from heartbeat.config import Settings
 from heartbeat.models.base import Base
+from heartbeat.models.check_result import CheckResult  # noqa: F401
 from heartbeat.models.endpoint import Endpoint  # noqa: F401
 from heartbeat.models.user import User  # noqa: F401
 

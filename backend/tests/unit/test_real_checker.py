@@ -54,9 +54,9 @@ async def test_201_is_success():
 
 
 async def test_timeout_maps_to_timeout():
-    outcome = await _make_checker(
-        exc=httpx.ReadTimeout("timed out", request=_REQ)
-    ).check(_FakeEndpoint())
+    outcome = await _make_checker(exc=httpx.ReadTimeout("timed out", request=_REQ)).check(
+        _FakeEndpoint()
+    )
     assert outcome.outcome == "failure"
     assert outcome.error_category == ErrorCategory.timeout
     assert outcome.status_code is None
@@ -71,17 +71,17 @@ async def test_connect_timeout_maps_to_timeout():
 
 
 async def test_connection_refused():
-    outcome = await _make_checker(
-        exc=httpx.ConnectError("Connection refused", request=_REQ)
-    ).check(_FakeEndpoint())
+    outcome = await _make_checker(exc=httpx.ConnectError("Connection refused", request=_REQ)).check(
+        _FakeEndpoint()
+    )
     assert outcome.outcome == "failure"
     assert outcome.error_category == ErrorCategory.connection_refused
 
 
 async def test_dns_error_by_message():
-    outcome = await _make_checker(
-        exc=httpx.ConnectError("getaddrinfo failed", request=_REQ)
-    ).check(_FakeEndpoint())
+    outcome = await _make_checker(exc=httpx.ConnectError("getaddrinfo failed", request=_REQ)).check(
+        _FakeEndpoint()
+    )
     assert outcome.outcome == "failure"
     assert outcome.error_category == ErrorCategory.dns
 
