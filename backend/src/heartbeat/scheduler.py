@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import logging
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -11,6 +12,9 @@ from heartbeat.clock import Clock
 from heartbeat.models.check_result import CheckResult
 from heartbeat.models.endpoint import Endpoint, StreakOutcome
 from heartbeat.services import incident_service
+
+if TYPE_CHECKING:
+    from heartbeat.services.alert_dispatcher import AlertDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -22,14 +26,17 @@ class Scheduler:
         checker: Checker,
         clock: Clock,
         concurrency: int = 50,
+        dispatcher: "AlertDispatcher | None" = None,
     ) -> None:
         self._session_factory = session_factory
         self._checker = checker
         self._clock = clock
         self._semaphore = asyncio.Semaphore(concurrency)
+        self._dispatcher = dispatcher
         self.in_flight: set[int] = set()
         self._loop_task: asyncio.Task | None = None
         self._in_flight_tasks: set[asyncio.Task] = set()
+        self._dispatch_tasks: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         self._loop_task = asyncio.create_task(self._loop(), name="scheduler-loop")
@@ -43,7 +50,14 @@ class Scheduler:
             self._loop_task = None
         if self._in_flight_tasks:
             await asyncio.gather(*list(self._in_flight_tasks), return_exceptions=True)
+        if self._dispatch_tasks:
+            await asyncio.gather(*list(self._dispatch_tasks), return_exceptions=True)
         logger.info("Scheduler stopped")
+
+    async def wait_for_dispatch(self) -> None:
+        """Wait for all pending dispatch tasks. For use in tests."""
+        if self._dispatch_tasks:
+            await asyncio.gather(*list(self._dispatch_tasks), return_exceptions=True)
 
     async def _loop(self) -> None:
         while True:
@@ -101,7 +115,7 @@ class Scheduler:
                 )
                 session.add(check_result)
 
-                await incident_service.apply_check_result(session, endpoint, check_result)
+                events = await incident_service.apply_check_result(session, endpoint, check_result)
 
                 interval = timedelta(seconds=endpoint.check_interval_seconds)
                 prev_due = endpoint.next_due_at
@@ -112,6 +126,16 @@ class Scheduler:
                 endpoint.next_due_at = next_due
 
                 await session.commit()
+                # IDs for any newly inserted incidents are now set (flush happened
+                # as part of commit); fire-and-forget dispatch after the transaction.
+                if self._dispatcher is not None:
+                    for kind, incident in events:
+                        task = asyncio.create_task(
+                            self._dispatcher.dispatch(kind, incident.id),
+                            name=f"alert-{kind.value}-{incident.id}",
+                        )
+                        self._dispatch_tasks.add(task)
+                        task.add_done_callback(self._dispatch_tasks.discard)
         except Exception:
             logger.exception("Error checking endpoint %d", endpoint_id)
         finally:

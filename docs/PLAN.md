@@ -184,7 +184,7 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 7 — Alert sinks, recipients, sent notifications
+## Phase 7 — Alert sinks, recipients, sent notifications ✓ DONE
 
 **Goal:** Opening or closing an incident dispatches an alert through whichever sink is configured. Recipients are managed via API. The log sink enforces the ring buffer.
 

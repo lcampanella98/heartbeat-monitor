@@ -8,14 +8,19 @@ import httpx
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from heartbeat.alerts.log_sink import LogSink
+from heartbeat.alerts.smtp_sink import SmtpSink
 from heartbeat.api.endpoints import router as endpoints_router
 from heartbeat.api.incidents import router as incidents_router
+from heartbeat.api.notifications import router as notifications_router
+from heartbeat.api.recipients import router as recipients_router
 from heartbeat.checker.real import RealChecker
 from heartbeat.checker.simulated import SimulatedChecker
 from heartbeat.clock import RealClock
 from heartbeat.config import settings
 from heartbeat.db import async_session_factory, check_db_connection, engine
 from heartbeat.scheduler import Scheduler
+from heartbeat.services.alert_dispatcher import AlertDispatcher
 from heartbeat.services.incident_service import M, N
 
 logger = logging.getLogger(__name__)
@@ -41,11 +46,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     app.state.checker = checker
 
+    if settings.email_sink == "log":
+        sink = LogSink(session_factory=async_session_factory)
+        logger.info("Alert sink: log (captured to DB)")
+    else:
+        sink = SmtpSink(settings=settings)
+        logger.info("Alert sink: smtp (outbound email)")
+
+    dispatcher = AlertDispatcher(session_factory=async_session_factory, sink=sink)
+
     scheduler = Scheduler(
         session_factory=async_session_factory,
         checker=checker,
         clock=clock,
         concurrency=settings.scheduler_concurrency,
+        dispatcher=dispatcher,
     )
     app.state.scheduler = scheduler
     await scheduler.start()
@@ -61,6 +76,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Heartbeat Monitor", lifespan=lifespan)
 app.include_router(endpoints_router)
 app.include_router(incidents_router)
+app.include_router(recipients_router)
+app.include_router(notifications_router)
 
 
 class SystemStatus(BaseModel):

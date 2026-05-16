@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from heartbeat.models.check_result import CheckResult
 from heartbeat.models.endpoint import Endpoint, StreakOutcome
 from heartbeat.models.incident import Incident
+from heartbeat.models.sent_notification import NotificationKind
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,10 @@ async def apply_check_result(
     session: AsyncSession,
     endpoint: Endpoint,
     check_result: CheckResult,
-) -> None:
+) -> list[tuple[NotificationKind, Incident]]:
+    """Update streak state and open/close incidents. Returns events for alert dispatch."""
     outcome = check_result.outcome
+    events: list[tuple[NotificationKind, Incident]] = []
 
     # Update streak state in-place on the endpoint
     if outcome == endpoint.current_streak_outcome:
@@ -37,12 +40,12 @@ async def apply_check_result(
         # streak_count already at N and an open incident exists, do not open a second.
         open_incident = await _get_open_incident(session, endpoint.id)
         if open_incident is None:
-            session.add(
-                Incident(
-                    endpoint_id=endpoint.id,
-                    started_at=endpoint.streak_started_at,
-                )
+            incident = Incident(
+                endpoint_id=endpoint.id,
+                started_at=endpoint.streak_started_at,
             )
+            session.add(incident)
+            events.append((NotificationKind.incident_opened, incident))
             logger.info("Incident opened for endpoint %d", endpoint.id)
 
     elif (
@@ -66,7 +69,10 @@ async def apply_check_result(
                 open_incident.started_at,
                 check_result.checked_at,
             )
+            events.append((NotificationKind.incident_closed, open_incident))
             logger.info("Incident %d closed for endpoint %d", open_incident.id, endpoint.id)
+
+    return events
 
 
 async def _get_open_incident(session: AsyncSession, endpoint_id: int) -> Incident | None:
