@@ -20,7 +20,9 @@ async def apply_check_result(
     endpoint: Endpoint,
     check_result: CheckResult,
 ) -> list[tuple[NotificationKind, Incident]]:
-    """Update streak state and open/close incidents. Returns events for alert dispatch."""
+    # Returns (kind, incident) pairs to be dispatched after the caller commits;
+    # dispatching post-commit ensures the dispatcher opens a fresh session to
+    # a fully consistent snapshot.
     outcome = check_result.outcome
     events: list[tuple[NotificationKind, Incident]] = []
 

@@ -10,7 +10,10 @@ class EmailRecipientCreate(BaseModel):
     @classmethod
     def validate_address(cls, v: str) -> str:
         v = v.strip().lower()
-        if not v or "@" not in v or v.startswith("@") or v.endswith("@"):
+        if "@" not in v:
+            raise ValueError("invalid email address")
+        local, domain = v.split("@", 1)
+        if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
             raise ValueError("invalid email address")
         return v
 

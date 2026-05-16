@@ -35,12 +35,16 @@ class SmtpSink:
         message["Subject"] = subject
         message.set_content(body)
 
-        await aiosmtplib.send(
-            message,
-            hostname=self._settings.smtp_host,
-            port=self._settings.smtp_port,
-            username=self._settings.smtp_username or None,
-            password=self._settings.smtp_password or None,
-            start_tls=self._settings.smtp_starttls,
-        )
+        try:
+            await aiosmtplib.send(
+                message,
+                hostname=self._settings.smtp_host,
+                port=self._settings.smtp_port,
+                username=self._settings.smtp_username or None,
+                password=self._settings.smtp_password or None,
+                start_tls=self._settings.smtp_starttls,
+            )
+        except Exception:
+            logger.warning("SMTP delivery failed for incident %d", incident_id, exc_info=True)
+            raise
         logger.info("SMTP alert sent for incident %d (kind=%s)", incident_id, kind.value)

@@ -27,6 +27,8 @@ class LogSink:
         body: str,
         recipients: list[str],
     ) -> None:
+        if not recipients:
+            return
         async with self._session_factory() as session:
             notification = SentNotification(
                 kind=kind,

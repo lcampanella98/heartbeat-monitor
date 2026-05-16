@@ -249,12 +249,7 @@ async def test_no_notifications_when_no_recipients(
 
     async with session_factory() as session:
         count = await session.scalar(select(func.count()).select_from(SentNotification))
-    # LogSink still inserts a row even with empty recipients
-    assert count == 1
-    async with session_factory() as session:
-        notif = await session.scalar(select(SentNotification))
-    assert notif is not None
-    assert notif.recipients == []
+    assert count == 0
 
 
 # ---------------------------------------------------------------------------

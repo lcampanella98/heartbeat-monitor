@@ -26,7 +26,7 @@ class SentNotification(Base):
     )
     subject: Mapped[str] = mapped_column(String, nullable=False)
     body: Mapped[str] = mapped_column(String, nullable=False)
-    recipients: Mapped[list] = mapped_column(JSONB, nullable=False)
+    recipients: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )

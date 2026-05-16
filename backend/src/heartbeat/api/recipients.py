@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from heartbeat.db import get_session
@@ -34,20 +35,14 @@ async def create_recipient(
     payload: EmailRecipientCreate,
     session: AsyncSession = Depends(get_session),
 ) -> EmailRecipientRead:
-    existing = await session.scalar(
-        select(EmailRecipient).where(
-            EmailRecipient.user_id == _USER_ID,
-            EmailRecipient.address == payload.address,
-        )
-    )
-    if existing is not None:
+    try:
+        recipient = EmailRecipient(user_id=_USER_ID, address=payload.address)
+        session.add(recipient)
+        await session.commit()
+        await session.refresh(recipient)
+        return recipient  # type: ignore[return-value]
+    except IntegrityError:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Address already exists")
-
-    recipient = EmailRecipient(user_id=_USER_ID, address=payload.address)
-    session.add(recipient)
-    await session.commit()
-    await session.refresh(recipient)
-    return recipient  # type: ignore[return-value]
 
 
 @router.delete("/{recipient_id}", status_code=status.HTTP_204_NO_CONTENT)

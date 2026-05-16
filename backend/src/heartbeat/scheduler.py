@@ -55,7 +55,7 @@ class Scheduler:
         logger.info("Scheduler stopped")
 
     async def wait_for_dispatch(self) -> None:
-        """Wait for all pending dispatch tasks. For use in tests."""
+        """Wait for all pending dispatch tasks to complete."""
         if self._dispatch_tasks:
             await asyncio.gather(*list(self._dispatch_tasks), return_exceptions=True)
 

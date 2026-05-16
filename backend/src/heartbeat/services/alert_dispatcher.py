@@ -27,7 +27,7 @@ def _build_message(
             f"Started at: {started}\n"
             f"Incident details: /incidents/{incident.id}\n"
         )
-    else:
+    elif kind == NotificationKind.incident_closed:
         ended = incident.ended_at.isoformat() if incident.ended_at else "unknown"
         duration = (
             f"{incident.duration_seconds}s" if incident.duration_seconds is not None else "unknown"
@@ -41,6 +41,8 @@ def _build_message(
             f"Duration: {duration}\n"
             f"Incident details: /incidents/{incident.id}\n"
         )
+    else:
+        raise ValueError(f"Unknown notification kind: {kind}")
 
     return subject, body
 
@@ -63,7 +65,13 @@ class AlertDispatcher:
                     return
 
                 recipients_rows = (
-                    (await session.execute(select(EmailRecipient).order_by(EmailRecipient.id)))
+                    (
+                        await session.execute(
+                            select(EmailRecipient)
+                            .where(EmailRecipient.user_id == 1)
+                            .order_by(EmailRecipient.id)
+                        )
+                    )
                     .scalars()
                     .all()
                 )
