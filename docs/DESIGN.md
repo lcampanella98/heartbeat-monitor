@@ -274,12 +274,12 @@ Alerts are dispatched by calling `alert_sink.send_email(...)` directly inside th
 
 A second asyncio task, also lifespan-managed. Runs every 5 minutes (and on demand via API). Per run:
 
-1. **Hourly rollups**: identify hour buckets touched since `now - 2 hours` (lookback window covers the current and previous bucket — idempotent UPSERT handles re-aggregation). For each `(endpoint_id, hour)`: `INSERT ... ON CONFLICT (endpoint_id, bucket_start) DO UPDATE SET ...` with aggregated counts and `uptime_pct`.
-2. **Daily rollups**: same pattern for `now - 2 days`, computed **from `hourly_rollups`** (cheaper than scanning raw and consistent with the read-routing). UPSERT into `daily_rollups`.
+1. **Hourly rollups**: re-aggregate hour buckets across the full raw window (`checked_at >= now - 30 days`). For each `(endpoint_id, hour)`: `INSERT ... ON CONFLICT (endpoint_id, bucket_start) DO UPDATE SET ...` with aggregated counts and `uptime_pct`.
+2. **Daily rollups**: same pattern across the full hourly window (`bucket_start >= now - 180 days`), computed **from `hourly_rollups`** (cheaper than scanning raw and consistent with the read-routing). UPSERT into `daily_rollups`.
 3. **Raw retention**: `DELETE FROM check_results WHERE checked_at < now - INTERVAL '30 days'`.
 4. **Hourly retention**: `DELETE FROM hourly_rollups WHERE bucket_start < now - INTERVAL '180 days'`.
 
-Idempotency means a missed run or a `Run rollup now` click is always safe.
+The lookback for each rollup tier equals that tier's retention window rather than a narrow recent slice. Idempotent UPSERT makes this safe to repeat, and the wide window means a rollup job that missed runs — or a `Run rollup now` click after extended downtime — recovers without any catch-up logic. At MVP scale (≤ 200 endpoints × 30 days × hourly buckets ≈ 144k rows) the cost is negligible; if it ever isn't, narrowing to `now - 2 h` / `now - 2 d` is a one-line change. The §13 seed extension (`run_once(full=True)`) widens the lookback further still, to cover the bulk-inserted 75-day backfill before retention sweeps it.
 
 ### 7.1 Storage tier read-routing
 
@@ -426,18 +426,48 @@ Test DB is a separate Postgres database created/dropped per test session (`pytes
 - `EMAIL_SINK == "log"`,
 - `SELECT COUNT(*) FROM endpoints == 0`.
 
-When triggered:
+Entrypoint: `maybe_seed(session_factory, clock, days: int = 75, rng_seed: int = 0)`. The `days` parameter exists so integration tests can run with 1-2 days (sub-second) while production startup uses 75. The seeder produces the DB state that 75 days of live operation would have produced, without per-check DB I/O, by simulating outcomes in memory and persisting only what survives retention plus what aggregation would have produced.
 
-1. Insert 5 example endpoints with varied simulator configs:
-   - 2 "healthy" (failure rate 0.5%, latency 80–200 ms).
-   - 1 "noisy" (failure rate 3%, latency 100–400 ms).
-   - 1 "flaky" (failure rate 8%, latency 150–600 ms).
-   - 1 "scheduled outage" (failure rate 1%, one daily outage window).
-2. Generate ~75 days of synthetic `check_results` by stepping a `FakeClock` from `now - 75 days` to `now` and calling `SimulatedChecker` on each due endpoint. Insert in bulk.
-3. Run the rollup job once: this writes hourly + daily rollups and deletes raw checks older than 30 days, leaving exactly the storage shape the running system would have after 75 days of operation.
-4. The incident-detection logic also runs during the synthesized history (because the seeder reuses the real scheduler tick function with a fake clock and a no-op alert sink), so any incidents that organically arise from the synthetic data — including their `frozen_timeline` — are persisted normally. The seeder does **not** hand-craft incidents.
+Phases:
 
-This produces a demo where the storage panel shows non-trivial numbers, the history chart spans 75 days across three tiers, and the AI postmortem feature has real incidents to demonstrate against on first load.
+1. **Endpoints.** Insert 5 example endpoints with simulator configs spanning all four interval choices:
+   - `api-prod` — 0.5% failure, 80-200 ms, 60s.
+   - `marketing-site` — 0.5% failure, 80-200 ms, 300s.
+   - `metrics-collector` — 3% failure, 100-400 ms, 30s.
+   - `payments-webhook` — 8% failure, 150-600 ms, 60s.
+   - `nightly-batch` — 1% failure, 80-200 ms, 900s, one daily outage window (e.g. 03:00-03:15 UTC).
+
+   This mix yields roughly 400k synthetic raw rows over 75 days, of which ~160k survive the 30-day retention sweep — comfortably bulk-insertable in seconds.
+
+2. **Simulate in memory.** For each endpoint, walk `t` forward from `now - days` to `now` in steps of `check_interval_seconds`. At each step: call `SimulatedChecker.check()` against the endpoint's sim config and `t`, append a `CheckResult` row dict to a buffer, and feed the outcome through `streak_step()` (the extracted state machine, §13.1). When `streak_step` signals an incident close, build the incident's `frozen_timeline` from the in-memory buffer (slice from the preceding success before `started_at` through the current step) and append an `Incident` row dict with timeline already populated. No DB I/O during this phase.
+
+3. **Bulk persist.** In one (or a few batched) transactions: `session.execute(insert(CheckResult), [...])` in batches of ~5,000 over the accumulated check rows, then bulk insert all accumulated incidents.
+
+4. **Backfill rollups + retention sweep.** Call `RollupJob.run_once(full=True)`: this widens the hourly UPSERT lookback to cover the entire seeded period rather than the steady-state 30-day window, then applies the normal retention deletes (raw > 30 d, hourly > 180 d). After this, the DB shape is identical to what 75 days of live operation would have produced.
+
+Alerts are **not** dispatched during seeding — the dispatcher and alert sinks are bypassed entirely. `sent_notifications` is reserved for live activity. A fixed `rng_seed` makes the seeded history reproducible, useful when iterating on UI against a stable incident set.
+
+### 13.1 Streak state machine extraction
+
+To keep the scheduler path and the seeder path on identical incident logic without dragging DB I/O into the seeder, the streak update + open/close decision is extracted from `incident_service.apply_check_result` into a pure function:
+
+```python
+@dataclass(frozen=True)
+class StreakState:
+    outcome: StreakOutcome | None
+    count: int
+    started_at: datetime | None
+
+@dataclass(frozen=True)
+class StreakDecision:
+    next_state: StreakState
+    open_at: datetime | None    # set on the check that hits N consecutive failures
+    close_at: datetime | None   # set on the check that hits M consecutive successes
+
+def streak_step(state: StreakState, outcome: StreakOutcome, checked_at: datetime) -> StreakDecision: ...
+```
+
+`apply_check_result` keeps its DB responsibilities (open-incident SELECT, frozen-timeline read from `check_results`, incident INSERT/UPDATE) but delegates the decision to `streak_step`. The seeder calls `streak_step` directly against its in-memory buffer. Existing incident unit tests are simplified to drive `streak_step` synchronously.
 
 ## 14. Local operations: start / stop scripts
 

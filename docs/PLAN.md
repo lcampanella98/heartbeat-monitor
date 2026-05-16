@@ -242,7 +242,7 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 ---
 
-## Phase 9 — AI postmortem generation
+## Phase 9 — AI postmortem generation ✓ DONE
 
 **Goal:** A user can generate, edit, and regenerate a postmortem draft for an incident via the API.
 
@@ -273,24 +273,37 @@ Status: In progress. Sequential, mechanical decomposition of the work described 
 
 **Goal:** Starting the stack with `scripts/start.sh --demo` against an empty DB produces a fully-realized demo: ~75 days of history across all three storage tiers, multiple incidents, and a banner indicating demo modes.
 
+Implementation follows DESIGN.md §13 (in-memory simulation, bulk persistence, one-shot rollup backfill). The spec is there; this phase is the decomposition.
+
 **Tasks**
 
-1. `seed.py`:
-   - Trigger condition: `settings.check_source == "simulated" and settings.email_sink == "log" and endpoint_count == 0`.
-   - Insert the 5 example endpoints per DESIGN.md §13 with their simulator configs.
-   - Generate synthetic history by stepping a `FakeClock` from `now - 75 days` to `now` in 30-second increments and invoking the same scheduler tick logic used in production (extracted in phase 5). This produces organic incidents via the normal incident_service path. Bulk-insert check_results to keep this fast.
-   - Use a `NoopSink` during seeding so the seeder doesn't fill the ring buffer with 75 days of synthetic alerts.
-   - After history is generated, run the rollup job once to produce hourly + daily rollups and delete raw older than 30 days.
-2. Call `seed.maybe_seed()` from FastAPI lifespan startup, after migrations.
+1. **Extract streak state machine** (prerequisite). Refactor `incident_service.apply_check_result` so the streak update + open/close decision lives in a pure function `streak_step(state, outcome, checked_at) -> StreakDecision` per DESIGN §13.1. `apply_check_result` retains its DB responsibilities (open-incident SELECT, frozen-timeline read from `check_results`, incident INSERT/UPDATE) and calls into `streak_step`. Migrate the existing incident unit tests to drive `streak_step` synchronously; integration tests stay as-is.
+
+2. **Extend `RollupJob.run_once(full: bool = False)`**. When `full=True`, the hourly UPSERT lookback widens to cover all available raw rows (and the daily UPSERT lookback widens analogously). Default call paths are unchanged. Add a unit test asserting the bound lookback parameter differs between modes.
+
+3. **`seed.py`** per DESIGN.md §13:
+   - Trigger: `settings.check_source == "simulated" and settings.email_sink == "log" and endpoint_count == 0`.
+   - `async def maybe_seed(session_factory, clock, days: int = 75, rng_seed: int = 0) -> None`.
+   - Insert the 5 example endpoints (with the interval mix specified in DESIGN §13).
+   - For each endpoint, simulate `days * 86400 / check_interval_seconds` checks in memory, feeding outcomes through `streak_step` and building `frozen_timeline` from an in-memory buffer on each close.
+   - Bulk insert all check_results (batches of 5,000) and all incidents.
+   - Call `RollupJob.run_once(full=True)`.
+   - Alerts are not dispatched during seeding (the dispatcher is bypassed).
+
+4. Wire `maybe_seed()` into FastAPI lifespan startup, after migrations and before the scheduler starts.
 
 **Tests**
 
-- Integration: with a sim+log fixture and an empty DB, run seeding; assert: 5 endpoints exist; raw count covers ~30 days; hourly and daily tiers populated; at least 1 incident exists with a non-empty `frozen_timeline`.
-- Integration: seeding is a no-op if endpoints already exist.
+- Unit: `streak_step` table-driven across the same sequences the previous `apply_check_result` tests covered (`[S,S,F,F,F,S,S]`, `[F,F,F,F,S,S]`, `[F,F,S,F,F,F,S,S]`, idle-when-incident-already-open, success-streak-reset-mid-failures).
+- Unit: `RollupJob.run_once(full=True)` binds a wider lookback parameter than the default.
+- Integration, fast: with a sim+log fixture and an empty DB, `await maybe_seed(days=2)`. Assert: 5 endpoints exist; check_results count in the expected order of magnitude (~13k for 2 days at the planned mix); hourly + daily rows present; if any incidents were generated, `frozen_timeline` is non-empty.
+- Integration: `maybe_seed()` is a no-op when endpoints already exist.
 
 **Done when**
 
-- A fresh `scripts/start.sh --demo` against a wiped volume produces a populated demo on first request.
+- `uv run pytest tests/integration/test_seed.py` finishes in well under 5 seconds.
+- A fresh `scripts/start.sh --demo` against a wiped volume completes startup in under a minute (rough goal; check empirically once implemented), and the dashboard's storage panel shows non-trivial raw/hourly/daily counts plus at least one historical incident on first request.
+- All prior phases' tests still pass after the `streak_step` extraction.
 
 ---
 
