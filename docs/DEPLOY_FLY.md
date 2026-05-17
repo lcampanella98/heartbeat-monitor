@@ -35,7 +35,7 @@ The frontend is already baked into the backend image (`Dockerfile.backend` stage
 
 ---
 
-## Phase A — Account, CLI, and org
+## Phase A — Account, CLI, and org - DONE
 
 **Goal:** A working `flyctl` on your workstation, signed in, with a Fly org that can host two apps.
 
@@ -52,7 +52,7 @@ The frontend is already baked into the backend image (`Dockerfile.backend` stage
 
 ---
 
-## Phase B — Repo changes
+## Phase B — Repo changes - DONE
 
 **Goal:** The repo carries the Fly configuration files and one small Dockerfile tweak. No runtime code changes.
 
@@ -172,7 +172,7 @@ The frontend is already baked into the backend image (`Dockerfile.backend` stage
 
 ---
 
-## Phase C — Deploy the Postgres app
+## Phase C — Deploy the Postgres app - DONE
 
 **Goal:** A reachable Postgres instance on `heartbeat-monitor-db.internal:5432` with a persistent volume.
 

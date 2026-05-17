@@ -11,8 +11,6 @@ The authoritative product, design, and implementation references live in `docs/`
 - `docs/DESIGN.md` — technical decisions (data model, interfaces, scheduler shape, libraries).
 - `docs/PLAN.md` — phased implementation order with per-phase tests and acceptance criteria.
 
-IMPORTANT: Read ALL THREE at the start of any session that involves implementation work, code changes, or updates to these documents. They are the source of truth: if implementation reveals a problem with a decision, update the relevant document first, then proceed.
-
 ## Limitations
 For the MVP, there will only be a single user (always logged in by default) but the database will support multiple users for future.
 
