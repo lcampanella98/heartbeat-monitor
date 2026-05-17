@@ -9,7 +9,9 @@ _USER_ID = 1
 
 
 async def list_endpoints(session: AsyncSession) -> list[Endpoint]:
-    result = await session.execute(select(Endpoint).where(Endpoint.user_id == _USER_ID))
+    result = await session.execute(
+        select(Endpoint).where(Endpoint.user_id == _USER_ID).order_by(Endpoint.id)
+    )
     return list(result.scalars().all())
 
 

@@ -9,8 +9,10 @@ from heartbeat.checker.simulated import SimulatedChecker
 from heartbeat.clock import Clock, FakeClock
 from heartbeat.config import settings
 from heartbeat.models.check_result import CheckResult
+from heartbeat.models.email_recipient import EmailRecipient
 from heartbeat.models.endpoint import Endpoint, StreakOutcome
 from heartbeat.models.incident import Incident
+from heartbeat.models.sent_notification import NotificationKind, SentNotification
 from heartbeat.rollup import RollupJob
 from heartbeat.services.incident_service import StreakState, streak_step
 
@@ -70,6 +72,7 @@ _SEED_ENDPOINTS = [
 ]
 
 _BATCH_SIZE = 5000
+_DEMO_RECIPIENTS = ["alice@example.com", "ops@example.com"]
 
 
 async def maybe_seed(
@@ -169,11 +172,81 @@ async def maybe_seed(
     rollup_job = RollupJob(session_factory=session_factory, clock=clock)
     await rollup_job.run_once(full=True)
 
+    # Seed recipients and notifications
+    await _seed_notifications(session_factory)
+
     logger.info(
         "Seed complete: %d check rows, %d closed incidents",
         len(all_check_rows),
         len(all_incidents),
     )
+
+
+async def _seed_notifications(session_factory: async_sessionmaker) -> None:
+    async with session_factory() as session:
+        for address in _DEMO_RECIPIENTS:
+            session.add(EmailRecipient(user_id=1, address=address))
+        await session.flush()
+
+        rows = (
+            await session.execute(
+                select(Incident, Endpoint)
+                .join(Endpoint, Incident.endpoint_id == Endpoint.id)
+                .order_by(Incident.started_at)
+            )
+        ).all()
+
+        for incident, endpoint in rows:
+            name = endpoint.name
+            url = endpoint.url
+            started = incident.started_at.isoformat()
+
+            open_subject = f"[Heartbeat] Incident opened: {name}"
+            open_body = (
+                f"An incident has been opened for endpoint '{name}'.\n\n"
+                f"URL: {url}\n"
+                f"Started at: {started}\n"
+                f"Incident details: /incidents/{incident.id}\n"
+            )
+            session.add(
+                SentNotification(
+                    kind=NotificationKind.incident_opened,
+                    incident_id=incident.id,
+                    subject=open_subject,
+                    body=open_body,
+                    recipients=_DEMO_RECIPIENTS,
+                    sent_at=incident.started_at,
+                )
+            )
+
+            if incident.ended_at is not None:
+                ended = incident.ended_at.isoformat()
+                duration = (
+                    f"{incident.duration_seconds}s"
+                    if incident.duration_seconds is not None
+                    else "unknown"
+                )
+                close_subject = f"[Heartbeat] Incident closed: {name}"
+                close_body = (
+                    f"The incident for endpoint '{name}' has been closed.\n\n"
+                    f"URL: {url}\n"
+                    f"Started at: {started}\n"
+                    f"Ended at: {ended}\n"
+                    f"Duration: {duration}\n"
+                    f"Incident details: /incidents/{incident.id}\n"
+                )
+                session.add(
+                    SentNotification(
+                        kind=NotificationKind.incident_closed,
+                        incident_id=incident.id,
+                        subject=close_subject,
+                        body=close_body,
+                        recipients=_DEMO_RECIPIENTS,
+                        sent_at=incident.ended_at,
+                    )
+                )
+
+        await session.commit()
 
 
 def _build_frozen_timeline(

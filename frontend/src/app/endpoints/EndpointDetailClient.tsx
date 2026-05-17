@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   BarChart,
@@ -68,15 +67,12 @@ function HistoryTooltip({ active, payload }: TooltipArgs) {
   )
 }
 
-export default function EndpointDetailClient() {
-  const params = useParams<{ id: string }>()
-  const endpointId = parseInt(params.id)
-  const validId = !isNaN(endpointId)
+export default function EndpointDetailClient({ endpointId }: { endpointId: number }) {
   const [range, setRange] = useState<Range>('7d')
 
-  const { data: endpoint, isLoading: epLoading } = useEndpoint(validId ? endpointId : 0)
-  const { data: history = [], isLoading: histLoading } = useEndpointHistory(validId ? endpointId : 0, range)
-  const { data: checks = [] } = useRecentChecks(validId ? endpointId : 0, 100)
+  const { data: endpoint, isLoading: epLoading } = useEndpoint(endpointId)
+  const { data: history = [], isLoading: histLoading } = useEndpointHistory(endpointId, range)
+  const { data: checks = [] } = useRecentChecks(endpointId, 100)
 
   if (epLoading) {
     return (
@@ -106,12 +102,12 @@ export default function EndpointDetailClient() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Link
+            <a
               href="/endpoints"
               className="text-xs text-muted-foreground hover:text-foreground font-mono"
             >
               Endpoints
-            </Link>
+            </a>
             <span className="text-muted-foreground/40 text-xs">/</span>
             <span className="text-xs text-muted-foreground font-mono">{endpoint.name}</span>
           </div>
@@ -174,7 +170,7 @@ export default function EndpointDetailClient() {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={history} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
+            <BarChart data={history} margin={{ top: 4, right: 20, bottom: 0, left: 0 }}>
               <CartesianGrid
                 vertical={false}
                 stroke="var(--color-border)"

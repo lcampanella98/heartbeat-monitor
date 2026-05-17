@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   useEndpoints,
@@ -11,6 +12,7 @@ import {
   useEnableEndpoint,
   useDisableEndpoint,
 } from '@/lib/queries'
+import EndpointDetailClient from './EndpointDetailClient'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -398,12 +400,20 @@ type DialogState =
   | { type: 'delete'; endpoint: Endpoint }
   | null
 
-export default function EndpointsPage() {
+function EndpointsPageInner() {
+  const searchParams = useSearchParams()
+  const idParam = searchParams.get('id')
+  const detailId = idParam ? parseInt(idParam) : NaN
+
   const { data: endpoints = [], isLoading } = useEndpoints()
   const enableEndpoint = useEnableEndpoint()
   const disableEndpoint = useDisableEndpoint()
   const [dialog, setDialog] = useState<DialogState>(null)
   const [dialogKey, setDialogKey] = useState(0)
+
+  if (!isNaN(detailId)) {
+    return <EndpointDetailClient endpointId={detailId} />
+  }
 
   const openDialog = (state: DialogState) => {
     setDialogKey((k) => k + 1)
@@ -472,7 +482,7 @@ export default function EndpointsPage() {
                 >
                   <td className="px-4 py-3">
                     <Link
-                      href={`/endpoints/${ep.id}`}
+                      href={`/endpoints?id=${ep.id}`}
                       className="font-medium hover:text-primary hover:underline"
                     >
                       {ep.name}
@@ -521,30 +531,38 @@ export default function EndpointsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => toggleEnabled(ep)}
-                        className="text-xs font-mono text-muted-foreground"
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        href={`/endpoints?id=${ep.id}`}
+                        className="text-xs font-mono text-muted-foreground hover:text-foreground px-2 py-1 shrink-0"
                       >
-                        {ep.enabled ? 'Disable' : 'Enable'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => openDialog({ type: 'edit', endpoint: ep })}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => openDialog({ type: 'delete', endpoint: ep })}
-                        className="text-danger hover:text-danger hover:bg-danger-subtle"
-                      >
-                        Delete
-                      </Button>
+                        View →
+                      </Link>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => toggleEnabled(ep)}
+                          className="text-xs font-mono text-muted-foreground"
+                        >
+                          {ep.enabled ? 'Disable' : 'Enable'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => openDialog({ type: 'edit', endpoint: ep })}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => openDialog({ type: 'delete', endpoint: ep })}
+                          className="text-danger hover:text-danger hover:bg-danger-subtle"
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -569,5 +587,13 @@ export default function EndpointsPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function EndpointsPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 bg-muted animate-pulse rounded" /></div>}>
+      <EndpointsPageInner />
+    </Suspense>
   )
 }

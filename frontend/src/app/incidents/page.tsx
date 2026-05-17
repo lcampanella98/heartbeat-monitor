@@ -1,15 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useEndpoints, useIncidents } from '@/lib/queries'
+import IncidentDetailClient from './IncidentDetailClient'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDuration, formatTimestamp } from '@/lib/format'
 
 type StateFilter = 'all' | 'active' | 'closed'
 
-export default function IncidentsPage() {
+function IncidentsPageInner() {
+  const searchParams = useSearchParams()
+  const idParam = searchParams.get('id')
+  const detailId = idParam ? parseInt(idParam) : NaN
+
   const [stateFilter, setStateFilter] = useState<StateFilter>('all')
   const [endpointFilter, setEndpointFilter] = useState<string>('all')
 
@@ -23,6 +29,10 @@ export default function IncidentsPage() {
     state: stateFilter === 'all' ? undefined : stateFilter,
     endpoint_id: endpointFilter !== 'all' ? parseInt(endpointFilter) : undefined,
   })
+
+  if (!isNaN(detailId)) {
+    return <IncidentDetailClient incidentId={detailId} />
+  }
 
   return (
     <div className="p-6">
@@ -94,6 +104,7 @@ export default function IncidentsPage() {
                 <th className="text-left px-4 py-2.5 font-medium hidden xl:table-cell">
                   Postmortem
                 </th>
+                <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -104,12 +115,9 @@ export default function IncidentsPage() {
                 return (
                   <tr key={incident.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/incidents/${incident.id}`}
-                        className="font-medium hover:text-primary hover:underline"
-                      >
+                      <span className="font-medium">
                         {ep?.name ?? `Endpoint #${incident.endpoint_id}`}
-                      </Link>
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {isOpen ? (
@@ -147,6 +155,14 @@ export default function IncidentsPage() {
                         <span className="text-xs text-muted-foreground/40 font-mono">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/incidents?id=${incident.id}`}
+                        className="text-xs font-mono text-muted-foreground hover:text-foreground"
+                      >
+                        View →
+                      </Link>
+                    </td>
                   </tr>
                 )
               })}
@@ -155,5 +171,13 @@ export default function IncidentsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function IncidentsPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 bg-muted animate-pulse rounded" /></div>}>
+      <IncidentsPageInner />
+    </Suspense>
   )
 }

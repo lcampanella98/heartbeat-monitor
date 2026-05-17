@@ -23,6 +23,15 @@ export function NavLinks() {
           <Link
             key={href}
             href={href}
+            onClick={(e) => {
+              // When the pathname already matches, force a full navigation so any
+              // query params (e.g. ?id=) are cleared — client-side pushState to
+              // the same pathname is a no-op in static-export mode.
+              if (pathname === href) {
+                e.preventDefault()
+                window.location.href = href
+              }
+            }}
             className={cn(
               'flex items-center px-3 py-2 text-sm rounded-md transition-colors',
               isActive

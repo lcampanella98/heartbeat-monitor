@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useEndpoint, useIncident, useRecentChecks, useGeneratePostmortem, useUpdatePostmortem } from '@/lib/queries'
 import { Button } from '@/components/ui/button'
@@ -192,18 +191,11 @@ function PostmortemPanel({ incidentId, content, generatedAt, editedAt }: {
   )
 }
 
-// ---- Main page ----
+// ---- Main component ----
 
-export default function IncidentDetailClient() {
-  const params = useParams<{ id: string }>()
-  const incidentId = parseInt(params.id)
-  const validId = !isNaN(incidentId)
-
-  const { data: incident, isLoading } = useIncident(validId ? incidentId : 0, { refetchInterval: 2000 })
-
+export default function IncidentDetailClient({ incidentId }: { incidentId: number }) {
+  const { data: incident, isLoading } = useIncident(incidentId, { refetchInterval: 2000 })
   const { data: endpoint } = useEndpoint(incident?.endpoint_id ?? 0)
-
-  // Live checks — always fetched; relevant when incident is open
   const { data: liveChecks = [] } = useRecentChecks(
     incident?.endpoint_id ?? 0,
     200,
@@ -238,7 +230,7 @@ export default function IncidentDetailClient() {
     <div className="p-6 max-w-3xl">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 mb-4 text-xs font-mono text-muted-foreground">
-        <Link href="/incidents" className="hover:text-foreground">Incidents</Link>
+        <a href="/incidents" className="hover:text-foreground">Incidents</a>
         <span className="text-muted-foreground/40">/</span>
         <span>#{incidentId}</span>
       </div>
@@ -264,7 +256,7 @@ export default function IncidentDetailClient() {
             </div>
             {endpoint && (
               <Link
-                href={`/endpoints/${endpoint.id}`}
+                href={`/endpoints?id=${endpoint.id}`}
                 className="font-semibold hover:text-primary hover:underline"
               >
                 {endpoint.name}

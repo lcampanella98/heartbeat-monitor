@@ -69,7 +69,7 @@ function EndpointCard({
 
   return (
     <Link
-      href={`/endpoints/${endpoint.id}`}
+      href={`/endpoints?id=${endpoint.id}`}
       className={cn(
         'block bg-card rounded-lg p-4 border transition-all group',
         'hover:border-primary/30 hover:bg-card/70',
@@ -143,7 +143,7 @@ export default function DashboardPage() {
               return (
                 <Link
                   key={incident.id}
-                  href={`/incidents/${incident.id}`}
+                  href={`/incidents?id=${incident.id}`}
                   className="flex items-center gap-2.5 hover:underline group"
                 >
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-danger shrink-0 animate-pulse" />
