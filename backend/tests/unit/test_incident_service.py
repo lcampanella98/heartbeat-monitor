@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from heartbeat.models.endpoint import StreakOutcome
-from heartbeat.services.incident_service import N, M, StreakState, streak_step
+from heartbeat.services.incident_service import StreakState, streak_step
 
 _FIXED_NOW = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
 _TICK = timedelta(seconds=60)

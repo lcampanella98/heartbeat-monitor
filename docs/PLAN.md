@@ -358,7 +358,7 @@ Implementation follows DESIGN.md §13 (in-memory simulation, bulk persistence, o
 
 ---
 
-## Phase 13 — README, scale-out section, manual smoke
+## Phase 13 — README, scale-out section, manual smoke ✓ DONE
 
 **Goal:** A first-time visitor to the repo can read README.md and understand the project, run the demo, find the design docs, and read the "how would we scale this?" narrative required by REQUIREMENTS.md §7.
 

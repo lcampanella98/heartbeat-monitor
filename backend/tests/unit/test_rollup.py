@@ -4,7 +4,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from heartbeat.rollup import _hourly_lookback, _daily_lookback, RAW_RETENTION_DAYS, HOURLY_RETENTION_DAYS
+from heartbeat.rollup import (
+    HOURLY_RETENTION_DAYS,
+    RAW_RETENTION_DAYS,
+    _daily_lookback,
+    _hourly_lookback,
+)
 from heartbeat.services.history_service import resolve_range
 
 

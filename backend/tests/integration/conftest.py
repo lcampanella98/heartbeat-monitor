@@ -9,6 +9,7 @@ from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
+
 from alembic import command
 
 # Test DB URL
@@ -49,9 +50,7 @@ def db_engine():
 
         async with admin_engine.connect() as conn:
             result = await conn.execute(
-                text(
-                    "SELECT 1 FROM pg_database WHERE datname = :db_name"
-                ),
+                text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
                 {"db_name": db_name},
             )
 

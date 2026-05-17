@@ -1,6 +1,5 @@
 """Integration tests for the demo seed."""
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -83,8 +82,8 @@ async def test_maybe_seed_noop_when_endpoints_exist(db_engine, monkeypatch) -> N
         ep_count = await session.scalar(select(func.count()).select_from(Endpoint))
         cr_count = await session.scalar(select(func.count()).select_from(CheckResult))
 
-    assert ep_count == 1   # still only the pre-existing endpoint
-    assert cr_count == 0   # no check results seeded
+    assert ep_count == 1  # still only the pre-existing endpoint
+    assert cr_count == 0  # no check results seeded
 
 
 async def test_maybe_seed_noop_when_not_demo_mode(db_engine, monkeypatch) -> None:
