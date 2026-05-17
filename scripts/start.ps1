@@ -8,9 +8,11 @@ $ErrorActionPreference = "Stop"
 
 $composeFiles = @("-f", "docker-compose.yml")
 if ($Demo) {
+    Write-Host "Activating demo mode..."
     $composeFiles += @("-f", "docker-compose.demo.yml")
 }
 if ($Smtp) {
+    Write-Host "Activating SMTP mode..."
     $composeFiles += @("-f", "docker-compose.smtp.yml")
 }
 
