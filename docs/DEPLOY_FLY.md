@@ -196,7 +196,7 @@ The frontend is already baked into the backend image (`Dockerfile.backend` stage
 
 ---
 
-## Phase D — Deploy the backend app
+## Phase D — Deploy the backend app - DONE
 
 **Goal:** `https://heartbeat-monitor-demo.fly.dev` serves the static frontend at `/` and the API at `/api/v1/...`, with scheduler and rollup loops running.
 
@@ -229,7 +229,7 @@ The frontend is already baked into the backend image (`Dockerfile.backend` stage
 
 ---
 
-## Phase E — GitHub Actions CI + auto-deploy
+## Phase E — GitHub Actions CI + auto-deploy - DONE
 
 **Goal:** PRs and pushes run lint + tests. Pushes to `main` redeploy the backend app, but only if CI passes. (Postgres is deployed once and rarely touched; we don't redeploy it from CI.)
 
@@ -354,7 +354,7 @@ The two workflows are split as the user requested:
 
 ---
 
-## Phase F — Verification and operability
+## Phase F — Verification and operability - DONE
 
 **Goal:** Confidence the demo is healthy and you know how to inspect it without re-reading this document.
 

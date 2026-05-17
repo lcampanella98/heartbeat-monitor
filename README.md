@@ -2,6 +2,18 @@
 
 Heartbeat Monitor is a self-hosted uptime monitor and status page. It polls user-registered HTTP(S) endpoints on a schedule, records every check result, raises incidents when an endpoint fails repeatedly, and generates AI-powered plain-English postmortem drafts on demand. A simulated mode replaces real HTTP checks with synthetic results so the full product can be explored without any live endpoints or outbound email.
 
+## Live demo
+
+**[https://heartbeat-monitor-demo.fly.dev/](https://heartbeat-monitor-demo.fly.dev/)**
+
+Runs in simulated mode (`CHECK_SOURCE=simulated`, `EMAIL_SINK=log`) with five pre-seeded endpoints and 75 days of synthetic history. No sign-in required.
+
+CI status: ![CI](https://github.com/lcampanella98/heartbeat-monitor/actions/workflows/ci.yml/badge.svg)
+
+Every push to `main` runs lint, type checks, and the full test suite before deploying. See [`.github/workflows/`](.github/workflows/) for the workflow definitions.
+
+---
+
 ## Screenshots
 
 _Dashboard showing endpoint state badges, recent-check strips, and uptime percentages:_
