@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$Demo
+    [switch]$Demo,
+    [switch]$Smtp
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,6 +9,9 @@ $ErrorActionPreference = "Stop"
 $composeFiles = @("-f", "docker-compose.yml")
 if ($Demo) {
     $composeFiles += @("-f", "docker-compose.demo.yml")
+}
+if ($Smtp) {
+    $composeFiles += @("-f", "docker-compose.smtp.yml")
 }
 
 Write-Host "Starting heartbeat-monitor..."

@@ -54,8 +54,9 @@ heartbeat-monitor/
         api.ts              fetch wrapper + typed endpoints
         queries.ts          TanStack Query hooks
       types/
-  docker-compose.yml
-  docker-compose.demo.yml   override that sets CHECK_SOURCE=simulated, EMAIL_SINK=log
+  docker-compose.yml         base: CHECK_SOURCE=real, EMAIL_SINK=log
+  docker-compose.demo.yml    override applied with --demo: CHECK_SOURCE=simulated
+  docker-compose.smtp.yml    override applied with --smtp: EMAIL_SINK=smtp, passes SMTP_* from .env
   Dockerfile.backend
   Dockerfile.frontend       (build stage only; static output copied into backend image)
   scripts/
@@ -358,8 +359,8 @@ All config via env vars, validated by `pydantic-settings`:
 | --- | --- | --- |
 | `DATABASE_URL` | — | Postgres connection string (e.g., `postgresql+asyncpg://...`). |
 | `CHECK_SOURCE` | `real` | `real` or `simulated`. |
-| `EMAIL_SINK` | `smtp` | `smtp` or `log`. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS` | — | Only required if `EMAIL_SINK=smtp`. |
+| `EMAIL_SINK` | `smtp` | `smtp` or `log`. Application default is `smtp`, but `docker-compose.yml` overrides to `log` so the default stack runs without SMTP credentials; opt in to `smtp` via `docker-compose.smtp.yml` (`--smtp`). |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS` | — | Only required if `EMAIL_SINK=smtp`. Passed through from `.env` by `docker-compose.smtp.yml`. |
 | `OPENROUTER_API_KEY` | — | Required for AI postmortem. If unset, the Generate button returns a clear error. |
 | `OPENROUTER_MODEL` | `openai/gpt-oss-120b` | Overridable for experimentation. |
 | `SCHEDULER_CONCURRENCY` | `50` | Semaphore cap; tunable without code change. |
@@ -475,14 +476,15 @@ Thin wrappers around `docker compose` so a fresh clone can be brought up with on
 
 ### Files
 
-- `docker-compose.yml` — base stack (backend + Postgres). Defaults: `CHECK_SOURCE=real`, `EMAIL_SINK=smtp`.
-- `docker-compose.demo.yml` — override that sets `CHECK_SOURCE=simulated` and `EMAIL_SINK=log` on the backend service. Applied with `-f docker-compose.yml -f docker-compose.demo.yml`.
+- `docker-compose.yml` — base stack (backend + Postgres). Defaults: `CHECK_SOURCE=real`, `EMAIL_SINK=log`. The `log` default keeps the OOTB experience runnable without SMTP credentials; real SMTP is opt-in.
+- `docker-compose.demo.yml` — override that sets `CHECK_SOURCE=simulated` on the backend service. Applied with `-f docker-compose.yml -f docker-compose.demo.yml`.
+- `docker-compose.smtp.yml` — override that sets `EMAIL_SINK=smtp` and passes `SMTP_HOST`/`SMTP_PORT`/`SMTP_USERNAME`/`SMTP_PASSWORD`/`SMTP_FROM`/`SMTP_STARTTLS` through from `.env`. Applied with `-f docker-compose.yml -f docker-compose.smtp.yml`.
 - `scripts/start.ps1`, `scripts/start.sh` — start the stack.
 - `scripts/stop.ps1`, `scripts/stop.sh` — stop the stack.
 
 ### `start` behavior
 
-1. Parse flag: `--demo` (POSIX) / `-Demo` (PowerShell). When set, include `-f docker-compose.demo.yml`.
+1. Parse flags: `--demo` / `-Demo` (include `-f docker-compose.demo.yml`); `--smtp` / `-Smtp` (include `-f docker-compose.smtp.yml`). Flags can be combined.
 2. `docker compose [files] up -d --build`.
 3. Poll `http://localhost:8000/api/v1/system/status` every 1 s for up to 60 s; fail with a clear error if it never returns 200.
 4. Print the local URL and the active mode badges (e.g., `check_source=simulated, email_sink=log`).

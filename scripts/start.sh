@@ -2,9 +2,11 @@
 set -euo pipefail
 
 DEMO=false
+SMTP=false
 for arg in "$@"; do
     case "$arg" in
         --demo) DEMO=true ;;
+        --smtp) SMTP=true ;;
         *) echo "Unknown argument: $arg" >&2; exit 1 ;;
     esac
 done
@@ -12,6 +14,9 @@ done
 COMPOSE_FILES="-f docker-compose.yml"
 if [ "$DEMO" = true ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.demo.yml"
+fi
+if [ "$SMTP" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.smtp.yml"
 fi
 
 echo "Starting heartbeat-monitor..."

@@ -2,7 +2,7 @@
 
 Heartbeat Monitor is a self-hosted uptime monitor and status page. It polls user-registered HTTP(S) endpoints on a schedule, records every check result, raises incidents when an endpoint fails repeatedly, and generates AI-powered plain-English postmortem drafts on demand. A simulated mode replaces real HTTP checks with synthetic results so the full product can be explored without any live endpoints or outbound email.
 
-**[Live demo](https://heartbeat-monitor-demo.fly.dev/)** — simulated mode, five pre-seeded endpoints, 75 days of synthetic history. No sign-in.
+**<a href="https://heartbeat-monitor-demo.fly.dev/" target="_blank" rel="noopener noreferrer">Live demo</a>** — simulated mode, five pre-seeded endpoints, 75 days of synthetic history. No sign-in.
 
 ![CI](https://github.com/lcampanella98/heartbeat-monitor/actions/workflows/ci.yml/badge.svg) — every push to `main` runs lint, type checks, and the full test suite before deploying.
 
@@ -89,27 +89,29 @@ On Windows (PowerShell):
 
 The `--demo` flag sets `CHECK_SOURCE=simulated` and `EMAIL_SINK=log`. On first startup against an empty database, the backend pre-seeds ~75 days of synthetic history across five example endpoints, including several past incidents and rollup data in all three storage tiers.
 
-To start in real mode (live HTTP checks, SMTP alerts), copy `.env.example` to `.env`, fill in `DATABASE_URL` and your SMTP credentials, then run `./scripts/start.sh` without `--demo`.
+Without `--demo`, the stack runs live HTTP checks but captures alert emails to the database (`EMAIL_SINK=log`) — no outbound mail required. To deliver real emails, also pass `--smtp` (or `-Smtp` on PowerShell) and provide SMTP credentials in `.env` (see `.env.example`).
 
 ## Configuration
 
-All configuration is via environment variables. Copy `.env.example` to `.env` for local development.
+When running via the start scripts and Docker Compose, most variables are already wired in:
 
-| Variable | Default | Required | Description |
+- `docker-compose.yml` (base, always applied) sets `DATABASE_URL`, `CHECK_SOURCE=real`, and `EMAIL_SINK=log`. The default stack therefore runs end-to-end with no `.env` required.
+- `docker-compose.demo.yml` (applied with `--demo`) overrides `CHECK_SOURCE=simulated` for the pre-seeded demo.
+- `docker-compose.smtp.yml` (applied with `--smtp`) overrides `EMAIL_SINK=smtp` and passes `SMTP_*` through from `.env`. Opt in when you want real email delivery.
+- `OPENROUTER_API_KEY` is the only value needed for the AI postmortem feature. Copy `.env.example` to `.env` and fill it in. Without it the rest of the app works fine; the Generate Postmortem button returns a clear error.
+
+Full reference (for non-Docker runs and for understanding what's overridable):
+
+| Variable | Default | Compose | Description |
 |---|---|---|---|
-| `DATABASE_URL` | — | Yes | Postgres connection string, e.g. `postgresql+asyncpg://user:pass@db:5432/heartbeat` |
-| `CHECK_SOURCE` | `real` | No | `real` or `simulated` |
-| `EMAIL_SINK` | `smtp` | No | `smtp` or `log` |
-| `SMTP_HOST` | — | If `EMAIL_SINK=smtp` | SMTP server hostname |
-| `SMTP_PORT` | `587` | No | SMTP server port |
-| `SMTP_USERNAME` | — | If `EMAIL_SINK=smtp` | SMTP username |
-| `SMTP_PASSWORD` | — | If `EMAIL_SINK=smtp` | SMTP password |
-| `SMTP_FROM` | — | If `EMAIL_SINK=smtp` | From address for alert emails |
-| `SMTP_STARTTLS` | `true` | No | Whether to use STARTTLS |
-| `OPENROUTER_API_KEY` | — | For AI postmortems | API key for OpenRouter (used by the postmortem generator) |
-| `OPENROUTER_MODEL` | `openai/gpt-oss-120b` | No | LLM model to use via OpenRouter |
-| `SCHEDULER_CONCURRENCY` | `50` | No | Max concurrent in-flight checks |
-| `LOG_LEVEL` | `INFO` | No | Backend log level |
+| `DATABASE_URL` | — | Set in base compose | Postgres connection string, e.g. `postgresql+asyncpg://user:pass@db:5432/heartbeat` |
+| `CHECK_SOURCE` | `real` | Set in base; overridden to `simulated` by `--demo` | `real` or `simulated` |
+| `EMAIL_SINK` | `smtp` | Set to `log` in base; overridden to `smtp` by `--smtp` | `smtp` or `log` |
+| `OPENROUTER_API_KEY` | — | Passed through from `.env` | Required for AI postmortems |
+| `OPENROUTER_MODEL` | `openai/gpt-oss-120b` | — | LLM model to use via OpenRouter |
+| `SCHEDULER_CONCURRENCY` | `50` | — | Max concurrent in-flight checks |
+| `LOG_LEVEL` | `INFO` | — | Backend log level |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS` | port 587, starttls true; others empty | Passed through from `.env` when `--smtp` is used | Only consulted when `EMAIL_SINK=smtp` |
 
 For a public demo deployment, set a spend cap on your OpenRouter key to bound exposure from repeated postmortem generation.
 
