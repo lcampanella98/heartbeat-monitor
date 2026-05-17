@@ -61,7 +61,12 @@ class Scheduler:
 
     async def _loop(self) -> None:
         while True:
-            await self.tick()
+            try:
+                await self.tick()
+            except Exception:
+                logger.exception("Scheduler tick failed; will retry in 5 s")
+                await asyncio.sleep(5.0)
+                continue
             await asyncio.sleep(1.0)
 
     async def tick(self) -> set[asyncio.Task[None]]:

@@ -104,7 +104,12 @@ class RollupJob:
 
     async def _loop(self) -> None:
         while True:
-            await self.run_once()
+            try:
+                await self.run_once()
+            except Exception:
+                logger.exception("Rollup failed; will retry in 60 s")
+                await asyncio.sleep(60)
+                continue
             await asyncio.sleep(self.interval_seconds)
 
     async def run_once(self, full: bool = False) -> None:
